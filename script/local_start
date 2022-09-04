@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Script for running local dev environment.
+# Assumes dependencies are managed externally.
+# docker, erlang and elixir must be already installed
+
+
+# Create phoenix application
+echo "Creating phoenix application"
+app_dir=${PWD##*/}
+cd ..
+yes Y | mix phx.new $app_dir
+cd $app_dir
+sed -i '' -e '/compilers.*gettext/d' mix.exs
+
+set -euo pipefail
+echo "Starting a Postgres database in a docker container"
+docker_command="docker-compose -f docker-compose.yml"
+$docker_command up -d postgres
+
+start_time=$(date +%s)
+while true
+do
+    echo "[&(($(date +%s) - $start_time))s] Waiting for postgres to be ready..."
+    docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1 \
+    && break
+done
+
+mix local.hex --if-missing
+mix do deps.get, deps.compile, ecto.create, ecto.migrate
+MIX_ENV=dev mix do deps.compile, ecto.create, ecto.migrate
+#npm install --prefix assets/
+mix phx.server
