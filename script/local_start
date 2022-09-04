@@ -20,7 +20,7 @@ start_time=$(date +%s)
 while true
 do
     echo "[&(($(date +%s) - $start_time))s] Waiting for postgres to be ready..."
-    docker-compose run --rm postgres psql postgresql://development:supersecret@postgres/template1 -c select 1 > /dev/null 2>&1 \
+    docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1 \
     && break
 done
 
