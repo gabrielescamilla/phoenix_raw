@@ -10,6 +10,7 @@ echo "Creating phoenix application"
 cd ..
 yes Y | mix phx.new phoenix_raw
 cd phoenix_raw
+sed -i '' -e '/compilers.*gettext/d' mix.exs
 
 set -euo pipefail
 echo "Starting a Postgres database in a docker container"
