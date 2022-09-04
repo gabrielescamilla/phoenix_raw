@@ -18,7 +18,7 @@ do
 done
 
 mix local.hex --if-missing
-mix do deps.compile, ecto.create, ecto.migrate
+mix do deps.get, deps.compile, ecto.create, ecto.migrate
 MIX_ENV=dev mix do deps.compile, ecto.create, ecto.migrate
 #npm install --prefix assets/
 mix phx.server
