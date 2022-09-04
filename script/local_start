@@ -4,20 +4,34 @@
 # Assumes dependencies are managed externally.
 # docker, erlang and elixir must be already installed
 
+brew install asdf
+asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
+asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
+asdf install erlang latest
+asdf install elixir latest
+asdf local erlang latest
+asdf local elixir latest
+
+app_dir=${PWD##*/}
 
 # Create phoenix application
-echo "Creating phoenix application"
-app_dir=${PWD##*/}
-cd ..
-yes Y | mix phx.new $app_dir
-cd $app_dir
-sed -i '' -e '/compilers.*gettext/d' mix.exs
+if [[ -f "mix.exs" ]]
+then
+  echo "Application $app_dir exists!"
+else
+  echo "Creating new phoenix application: $app_dir"
+  cd ..
+  yes Y \n| mix phx.new $app_dir
+  cd $app_dir
+  sed -i '' -e '/compilers.*gettext/d' mix.exs
+fi
 
 set -euo pipefail
+
+# Spin up database in docker
 echo "Starting a Postgres database in a docker container"
 docker_command="docker-compose -f docker-compose.yml"
-$docker_command up -d postgres
-
+$docker_command up --no-recreate -d postgres
 start_time=$(date +%s)
 while true
 do
@@ -26,8 +40,11 @@ do
     && break
 done
 
+# Get deps, compile, create database  and run migrations
 mix local.hex --if-missing
 mix do deps.get, deps.compile, ecto.create, ecto.migrate
 MIX_ENV=dev mix do deps.compile, ecto.create, ecto.migrate
 #npm install --prefix assets/
-mix phx.server
+
+echo "Running server"
+open http://localhost:4000 & mix phx.server
