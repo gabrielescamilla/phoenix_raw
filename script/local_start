@@ -7,9 +7,10 @@
 
 # Create phoenix application
 echo "Creating phoenix application"
+app_dir=${PWD##*/}
 cd ..
-yes Y | mix phx.new phoenix_raw
-cd phoenix_raw
+yes Y | mix phx.new $app_dir
+cd $app_dir
 sed -i '' -e '/compilers.*gettext/d' mix.exs
 
 set -euo pipefail
