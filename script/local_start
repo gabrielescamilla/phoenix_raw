@@ -5,17 +5,15 @@
 # docker, erlang and elixir must be already installed
 
 
-
-
-set -euo pipefail
-
 # Create phoenix application
+echo "Creating phoenix application"
 cd ..
-mix phx.new phoenix_raw
+yes Y | mix phx.new phoenix_raw
 cd phoenix_raw
 
+set -euo pipefail
+echo "Starting a Postgres database in a docker container"
 docker_command="docker-compose -f docker-compose.yml"
-
 $docker_command up -d postgres
 
 start_time=$(date +%s)
