@@ -4,7 +4,16 @@
 # Assumes dependencies are managed externally.
 # docker, erlang and elixir must be already installed
 
+
+
+
 set -euo pipefail
+
+# Create phoenix application
+cd ..
+mix phx.new phoenix_raw
+cd phoenix_raw
+
 docker_command="docker-compose -f docker-compose.yml"
 
 $docker_command up -d postgres
