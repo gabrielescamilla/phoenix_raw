@@ -1,26 +1,69 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 #
-# Script for running local dev environment.
-# Assumes dependencies are managed externally.
-# docker, erlang and elixir must be already installed
+# Script setting up local dev environment for a Phoenix application.
+# Assumes osx with zsh and docker desktop are present.
 
-brew install asdf
+echo "This script will do the following if needed:\n"
+echo " - install asdf to manage erlang and elixir versions. See: https://asdf-vm.com/ \n"
+echo " - add asdf to your zshrc \n"
+echo " - source your zshrc one or more times \n"
+echo " - install latest erlang and elixir using asdf for the current dir and parent dir as well \n"
+
+printf 'OK to continue (y/n)? '
+read answer
+if [ "$answer" != "${answer#[Yy]}" ] ;then 
+else
+  exit 1
+fi
+
+#
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Check and add asdf.sh to your ~/.zshrc if needed with:
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+if grep -q "asdf" ~/.zshrc; then
+  echo '✓ asdf presest' 
+else
+  echo '@@@@@@@@@@@@@@@'
+  echo 'installing asdf'
+  echo '@@@@@@@@@@@@@@@'
+  brew update
+  brew install asdf
+  echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ${ZDOTDIR:-~}/.zshrc
+  source ~/.zshrc
+fi
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Install asdf plugins for erlang/elixir in app dir 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
 asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
-asdf install erlang latest
-asdf install elixir latest
-asdf local erlang latest
+asdf local erlast latest
 asdf local elixir latest
+asdf install
 
 app_dir=${PWD##*/}
 
-# Create phoenix application
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Create Phoenix application if it does not exist with:
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 if [[ -f "mix.exs" ]]
 then
   echo "Application $app_dir exists!"
+  source ~/.zshrc
 else
-  echo "Creating new phoenix application: $app_dir"
+  echo '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
+  echo "Creating new phoenix application using latest erlang/elixir in: $app_dir"
+  echo '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
   cd ..
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  # Install asdf plugins for erlang/elixir in parent dir 
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  asdf local erlang latest
+  asdf local elixir latest
+  asdf install
+  source ~/.zshrc
+  yes Y \n| mix local.hex --if-missing
+  yes Y \n| mix archive.install hex phx_new
   yes Y \n| mix phx.new $app_dir
   cd $app_dir
   sed -i '' -e '/compilers.*gettext/d' mix.exs
@@ -28,23 +71,43 @@ fi
 
 set -euo pipefail
 
-# Spin up database in docker
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Spin database in docker
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+if (! docker stats --no-stream ); then
+  # Starting Docker Daemon
+  echo "Launching Docker Daemon"
+  open /Applications/Docker.app
+ # Waiting for  Docker daemon is running 
+while (! docker stats --no-stream ); do
+  # Docker takes a few seconds to initialize
+  echo "Waiting for Docker to launch..."
+  sleep 1
+done
+fi
+
 echo "Starting a Postgres database in a docker container"
-docker_command="docker-compose -f docker-compose.yml"
-$docker_command up --no-recreate -d postgres
+
 start_time=$(date +%s)
+if (! docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1); then
+  docker-compose -f docker-compose.yml up --no-recreate -d postgres
+fi
+
 while true
 do
-    echo "[&(($(date +%s) - $start_time))s] Waiting for postgres to be ready..."
-    docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1 \
-    && break
+  echo "[&(($(date +%s) - $start_time))s] Waiting for postgres to be ready..."
+  docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1 \
+  && break
 done
 
 # Get deps, compile, create database  and run migrations
+echo "compiling application"
 mix local.hex --if-missing
+mix local.rebar --force
 mix do deps.get, deps.compile, ecto.create, ecto.migrate
 MIX_ENV=dev mix do deps.compile, ecto.create, ecto.migrate
 #npm install --prefix assets/
 
-echo "Running server"
+echo "Running server..."
 open http://localhost:4000 & mix phx.server
