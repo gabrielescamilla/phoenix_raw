@@ -37,7 +37,9 @@ fi
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
 asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
-asdf local erlast latest
+asdf install erlang latest
+asdf install elixir latest
+asdf local erlang latest
 asdf local elixir latest
 asdf install
 
