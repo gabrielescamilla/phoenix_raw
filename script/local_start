@@ -16,6 +16,34 @@ else
   exit 1
 fi
 
+RED='\033[0;31m'
+FRM='\033[1;37m'
+TXT='\033[0;33m'
+NC='\033[0m' # No Color
+
+spin()
+{
+  spinner="/|\\-/|\\-"
+  while :
+  do
+    for i in `seq 0 7`
+    do
+      echo -n "${spinner:$i:1}"
+      echo -en "\010"
+      sleep 1
+    done
+  done
+}
+
+msg()
+{
+  xx="--------------------------------------------------------------------------------------------------------------"
+  ln="${xx:0:${#${1}}}"
+  printf "${FRM} ${ln} \n"
+  printf "${TXT} $1 ${FRM}\n"
+  printf " ${ln} ${NC}\n"
+}
+
 #
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Check and add asdf.sh to your ~/.zshrc if needed with:
@@ -23,18 +51,21 @@ fi
 if grep -q "asdf" ~/.zshrc; then
   echo '✓ asdf presest' 
 else
-  echo '@@@@@@@@@@@@@@@'
-  echo 'installing asdf'
-  echo '@@@@@@@@@@@@@@@'
+  msg "Installing asdf"
+  spin &
+  SPIN_ID=$!
+  trap "kill -9 $SPIN_ID" `seq 0 15`
   brew update
   brew install asdf
   echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ${ZDOTDIR:-~}/.zshrc
   source ~/.zshrc
+  kill -9 $SPIN_ID
 fi
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Install asdf plugins for erlang/elixir in app dir 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+msg "Adding erlash/elixir latest with asd"
 asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
 asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
 asdf install erlang latest
@@ -53,13 +84,8 @@ then
   echo "Application $app_dir exists!"
   source ~/.zshrc
 else
-  echo '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
-  echo "Creating new phoenix application using latest erlang/elixir in: $app_dir"
-  echo '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
+  msg "Creating new phoenix application using latest erlang/elixir in: $app_dir"
   cd ..
-  # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  # Install asdf plugins for erlang/elixir in parent dir 
-  # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   asdf local erlang latest
   asdf local elixir latest
   asdf install
@@ -76,7 +102,7 @@ set -euo pipefail
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Spin database in docker
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
+msg "Launching database in docker container"
 if (! docker stats --no-stream ); then
   # Starting Docker Daemon
   echo "Launching Docker Daemon"
@@ -90,7 +116,6 @@ done
 fi
 
 echo "Starting a Postgres database in a docker container"
-
 start_time=$(date +%s)
 if (! docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1); then
   docker-compose -f docker-compose.yml up --no-recreate -d postgres
@@ -104,6 +129,7 @@ do
 done
 
 # Get deps, compile, create database  and run migrations
+msg "Launching Phoenix application"
 echo "compiling application"
 mix local.hex --if-missing
 mix local.rebar --force
