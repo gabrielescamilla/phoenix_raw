@@ -23,14 +23,21 @@ NC='\033[0m' # No Color
 
 spin()
 {
-  spinner="/|\\-/|\\-"
+  #spinner="◴◷◶◵◴◷◶◵"
+  #spinner="▉▊▋▌▍▎▏▎▍▌▋▊▉"
+  #spinner="←↖↑↗→↘↓↙"
+  spinner="⣾⣽⣻⢿⡿⣟⣯⣷"
+  #spinner="⠁⠂⠄⡀⢀⠠⠐⠈"
   while :
   do
     for i in `seq 0 7`
     do
       echo -n "${spinner:$i:1}"
       echo -en "\010"
-      sleep 1
+      if ! ((i % 8)); then
+        echo -n "▉"
+      fi
+      sleep 0.5 
     done
   done
 }
@@ -60,12 +67,13 @@ else
   echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ${ZDOTDIR:-~}/.zshrc
   source ~/.zshrc
   kill -9 $SPIN_ID
+  echo -n "▉\n"
 fi
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Install asdf plugins for erlang/elixir in app dir 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-msg "Adding erlash/elixir latest with asd"
+msg "asd adding erlash/elixir latest"
 asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
 asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
 asdf install erlang latest
@@ -84,8 +92,9 @@ then
   echo "Application $app_dir exists!"
   source ~/.zshrc
 else
-  msg "Creating new phoenix application using latest erlang/elixir in: $app_dir"
+  msg "Creating new $app_dir phoenix application"
   cd ..
+  echo "Using latest erlang/elixir"
   asdf local erlang latest
   asdf local elixir latest
   asdf install
@@ -94,6 +103,7 @@ else
   yes Y \n| mix archive.install hex phx_new
   yes Y \n| mix phx.new $app_dir
   cd $app_dir
+  echo "Removing unneeded gettext from mix.exs"
   sed -i '' -e '/compilers.*gettext/d' mix.exs
 fi
 
@@ -104,29 +114,32 @@ set -euo pipefail
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 msg "Launching database in docker container"
 if (! docker stats --no-stream ); then
-  # Starting Docker Daemon
-  echo "Launching Docker Daemon"
+  echo "Launching Docker Daemon..."
+  spin &
+  SPIN_ID=$!
+  trap "kill -9 $SPIN_ID" `seq 0 15`
   open /Applications/Docker.app
- # Waiting for  Docker daemon is running 
-while (! docker stats --no-stream ); do
-  # Docker takes a few seconds to initialize
-  echo "Waiting for Docker to launch..."
-  sleep 1
-done
+  while (! docker stats --no-stream > /dev/null 2>&1); do
+    sleep 1
+  done
+  kill -9 $SPIN_ID
+  echo -n "▉\n"
 fi
 
 echo "Starting a Postgres database in a docker container"
-start_time=$(date +%s)
+spin &
+SPIN_ID=$!
+trap "kill -9 $SPIN_ID" `seq 0 15`
 if (! docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1); then
   docker-compose -f docker-compose.yml up --no-recreate -d postgres
 fi
-
 while true
 do
-  echo "[&(($(date +%s) - $start_time))s] Waiting for postgres to be ready..."
   docker-compose run --rm postgres psql postgresql://postgres:postgres@postgres/template1 -c select 1 > /dev/null 2>&1 \
   && break
 done
+kill -9 $SPIN_ID
+echo -n "▉\n"
 
 # Get deps, compile, create database  and run migrations
 msg "Launching Phoenix application"
